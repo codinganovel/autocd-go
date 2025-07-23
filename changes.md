@@ -54,3 +54,51 @@ The original approach of checking `strings.Contains()` on error messages was bri
 ### Verification
 
 After all changes and fixes were applied, the entire test suite was run using `go test -v ./...`, and all tests passed successfully, confirming the correctness and robustness of the refactored error handling.
+
+## Bug Investigation and AUTOCD_DEBUG Fix
+
+### Summary
+
+Investigated reported bugs in the autocd-go library and fixed the `AUTOCD_DEBUG` environment variable handling issue.
+
+### Bug Reports Investigated
+
+1. **ExitWithDirectory() "Silent Failure"** - **NOT A LIBRARY BUG**
+   - **Finding**: Library works correctly, issue is in client integration code
+   - **Evidence**: Created reproduction cases that work perfectly
+   - **Conclusion**: The reported failure is an integration issue, not a library bug
+
+2. **Debug Output Issues** - **PARTIALLY FIXED**
+   - **Issue**: `AUTOCD_DEBUG` environment variable was ignored by `ExitWithDirectory()`
+   - **Root Cause**: Default options didn't check environment variable
+   - **Fix Applied**: Modified `ExitWithDirectoryAdvanced()` to check `AUTOCD_DEBUG` when options are nil
+
+### Changes Made
+
+**File**: `autocd.go` line 24
+
+**Before**:
+```go
+opts = &Options{
+    SecurityLevel: SecurityNormal,
+    DebugMode:     false,
+}
+```
+
+**After**:
+```go
+opts = &Options{
+    SecurityLevel: SecurityNormal,
+    DebugMode:     os.Getenv("AUTOCD_DEBUG") != "",
+}
+```
+
+### Rationale
+
+The `ExitWithDirectory()` function is the primary library interface and should respect the `AUTOCD_DEBUG` environment variable for consistency with `ExitWithDirectoryOrFallback()`. Previously, only the advanced function with explicit options could enable debug mode.
+
+### Verification
+
+- Tested debug output appears only when `AUTOCD_DEBUG=1` is set
+- Confirmed library functions correctly in all scenarios
+- All existing tests continue to pass

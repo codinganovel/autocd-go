@@ -21,7 +21,7 @@ func ExitWithDirectoryAdvanced(targetPath string, opts *Options) error {
 	if opts == nil {
 		opts = &Options{
 			SecurityLevel: SecurityNormal,
-			DebugMode:     false,
+			DebugMode:     os.Getenv("AUTOCD_DEBUG") != "",
 		}
 	}
 
