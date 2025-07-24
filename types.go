@@ -45,10 +45,12 @@ type ShellInfo struct {
 
 // Options provides configuration for ExitWithDirectoryAdvanced
 type Options struct {
-	Shell         string        // Override shell detection ("", "bash", "cmd", etc.)
-	SecurityLevel SecurityLevel // Strict, Normal, Permissive
-	DebugMode     bool          // Enable verbose logging to stderr
-	TempDir       string        // Override temp directory ("" = system default)
+	Shell                  string        // Override shell detection ("", "bash", "cmd", etc.)
+	SecurityLevel         SecurityLevel // Strict, Normal, Permissive
+	DebugMode             bool          // Enable verbose logging to stderr
+	TempDir               string        // Override temp directory ("" = system default)
+	DepthWarningThreshold int           // Shell depth threshold for warnings (default: 15)
+	DisableDepthWarnings  bool          // Disable shell depth warning messages (default: false)
 }
 
 // ErrorType categorizes different types of autocd errors

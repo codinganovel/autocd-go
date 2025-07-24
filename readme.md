@@ -102,6 +102,20 @@ opts := &autocd.Options{
 err := autocd.ExitWithDirectoryAdvanced("/target/path", opts)
 ```
 
+## Shell Depth Warnings
+
+AutoCD automatically warns when you have many nested shells from navigation:
+
+```
+💡 Tip: You have 15 nested shells from navigation.  
+For better performance, consider opening a fresh terminal.
+```
+
+Disable warnings if needed:
+```go
+opts := &autocd.Options{DisableDepthWarnings: true}
+```
+
 ### Guaranteed Exit
 
 If you want to guarantee your process exits one way or another:
