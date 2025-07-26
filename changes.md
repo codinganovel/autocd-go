@@ -212,13 +212,6 @@ Created test application `test_shell_depth/test_shell_depth_app` for manual veri
 
 Updated all three documentation files:
 
-#### CLAUDE.md
-- Updated `Options` description and advanced usage examples
-- Added comprehensive "Shell Depth Warnings" section with:
-  - How it works (Unix vs Windows)
-  - Example warning messages
-  - Configuration options and disable instructions
-
 #### README.md  
 - Enhanced advanced usage example with new options
 - Added concise "Shell Depth Warnings" section with basic explanation and disable option
