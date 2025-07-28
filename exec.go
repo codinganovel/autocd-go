@@ -37,8 +37,21 @@ func executeWindowsScript(scriptPath string, shell *ShellInfo) error {
 		args = []string{"cmd.exe", "/c", scriptPath}
 	}
 
-	// Replace current process
-	return syscall.Exec(executable, args, os.Environ())
+	// Windows doesn't support syscall.Exec, use StartProcess instead
+	attr := &syscall.ProcAttr{
+		Dir:   "",
+		Env:   os.Environ(),
+		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd()},
+	}
+	
+	_, _, err := syscall.StartProcess(executable, args, attr)
+	if err != nil {
+		return err
+	}
+	
+	// Exit current process after starting the new shell
+	os.Exit(0)
+	return nil
 }
 
 func executeUnixScript(scriptPath string, shell *ShellInfo) error {
