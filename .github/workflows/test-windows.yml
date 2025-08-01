@@ -28,7 +28,7 @@ jobs:
         cd test_windows
         
         # Create the test app (using UTF8 without BOM)
-        $content = @"
+        $content = @'
 package main
 
 import (
@@ -78,11 +78,11 @@ func main() {
 	fmt.Printf("❌ BUG: Process was NOT replaced - this line should never be reached!\n")
 	fmt.Printf("Still in directory: %s\n", getCurrentDir())
 }
-"@
+'@
         [System.IO.File]::WriteAllText("test_app.go", $content, [System.Text.UTF8Encoding]::new($false))
         
         # Create go.mod (UTF8 without BOM)
-        $modContent = @"
+        $modContent = @'
 module test-app
 
 go 1.21
@@ -90,8 +90,9 @@ go 1.21
 replace autocd => ../
 
 require autocd v0.0.0-00010101000000-000000000000
-"@
+'@
         [System.IO.File]::WriteAllText("go.mod", $modContent, [System.Text.UTF8Encoding]::new($false))
+      shell: powershell
       shell: powershell
     
     - name: Build test application
@@ -140,7 +141,7 @@ require autocd v0.0.0-00010101000000-000000000000
         echo "=== TEST 5: Shell detection only ==="
         
         # Create a minimal test that just shows detection (UTF8 without BOM)
-        $detectContent = @"
+        $detectContent = @'
 package main
 import (
 	"fmt"
@@ -158,7 +159,7 @@ func main() {
 		fmt.Printf("No shell detected\n")
 	}
 }
-"@
+'@
         [System.IO.File]::WriteAllText("detect_test.go", $detectContent, [System.Text.UTF8Encoding]::new($false))
         
         go build -o detect_test.exe detect_test.go
