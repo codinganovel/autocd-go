@@ -22,19 +22,17 @@ func executeScript(scriptPath string, shell *ShellInfo, debugMode bool) error {
 }
 
 func executeWindowsScript(scriptPath string, shell *ShellInfo) error {
-	var executable string
+	// Use the detected shell path, not hardcoded executable names
+	executable := shell.Path
 	var args []string
 
 	switch shell.Type {
 	case ShellPowerShell:
-		executable = "powershell.exe"
-		args = []string{"powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
+		args = []string{shell.Path, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
 	case ShellPowerShellCore:
-		executable = "pwsh.exe"
-		args = []string{"pwsh.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
+		args = []string{shell.Path, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
 	default: // ShellCmd
-		executable = "cmd.exe"
-		args = []string{"cmd.exe", "/c", scriptPath}
+		args = []string{shell.Path, "/c", scriptPath}
 	}
 
 	// Windows doesn't support syscall.Exec, use StartProcess instead
