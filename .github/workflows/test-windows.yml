@@ -20,6 +20,15 @@ jobs:
       with:
         go-version: '1.21'
     
+    - name: Initialize main module
+      run: |
+        # Create go.mod for the main autocd library if it doesn't exist
+        if (!(Test-Path "go.mod")) {
+          go mod init autocd
+          go mod tidy
+        }
+      shell: powershell
+    
     - name: Create test directory
       run: mkdir test_windows
     
@@ -34,7 +43,7 @@ jobs:
         import (
         	"fmt"
         	"os"
-        	"github.com/codinganovel/autocd-go"
+        	autocd "../"
         )
         
         func getCurrentDir() string {
@@ -80,15 +89,22 @@ jobs:
         }
         "@ | Out-File -FilePath test_app.go -Encoding UTF8
         
-        # Initialize Go module
-        go mod init test-app
-        go mod edit -replace github.com/codinganovel/autocd-go=../
-        go get github.com/codinganovel/autocd-go
+        # Create go.mod that references parent directory
+        @"
+        module test-app
+        
+        go 1.21
+        
+        replace autocd => ../
+        
+        require autocd v0.0.0-00010101000000-000000000000
+        "@ | Out-File -FilePath go.mod -Encoding UTF8
       shell: powershell
     
     - name: Build test application
       run: |
         cd test_windows
+        go mod tidy
         go build -o test_app.exe test_app.go
       shell: powershell
     
@@ -135,7 +151,7 @@ jobs:
         package main
         import (
         	"fmt"
-        	"github.com/codinganovel/autocd-go"
+        	autocd "../"
         )
         func main() {
         	fmt.Printf("Platform supported: %v\n", autocd.IsSupported())
