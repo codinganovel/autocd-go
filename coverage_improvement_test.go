@@ -59,12 +59,12 @@ func TestValidateShellOverride(t *testing.T) {
 			}
 
 			result := validateShellOverride(tt.shellOverride)
-			
+
 			if result.IsValid != tt.wantValid {
-				t.Errorf("validateShellOverride(%s).IsValid = %v, want %v", 
+				t.Errorf("validateShellOverride(%s).IsValid = %v, want %v",
 					tt.shellOverride, result.IsValid, tt.wantValid)
 			}
-			
+
 			if result.IsValid && result.Type != tt.wantShellType {
 				t.Errorf("validateShellOverride(%s).Type = %v, want %v",
 					tt.shellOverride, result.Type, tt.wantShellType)
@@ -95,7 +95,7 @@ func TestGetScriptExtensionForShell(t *testing.T) {
 		t.Run(fmt.Sprintf("shell_%d", tt.shellType), func(t *testing.T) {
 			got := getScriptExtensionForShell(tt.shellType)
 			if got != tt.want {
-				t.Errorf("getScriptExtensionForShell(%v) = %v, want %v", 
+				t.Errorf("getScriptExtensionForShell(%v) = %v, want %v",
 					tt.shellType, got, tt.want)
 			}
 		})
@@ -129,7 +129,7 @@ func TestFindExecutable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := findExecutable(tt.executable)
-			
+
 			if tt.wantFound && got == "" {
 				// Skip if expected command doesn't exist on this system
 				if _, err := exec.LookPath(tt.executable); err != nil {
@@ -137,7 +137,7 @@ func TestFindExecutable(t *testing.T) {
 				}
 				t.Errorf("findExecutable(%s) returned empty, expected path", tt.executable)
 			}
-			
+
 			if !tt.wantFound && got != "" {
 				t.Errorf("findExecutable(%s) = %v, expected empty", tt.executable, got)
 			}
@@ -187,18 +187,18 @@ func TestCreateTemporaryScript(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			scriptPath, err := createTemporaryScript(tt.content, tt.extension, tt.tempDir)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createTemporaryScript() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				// Verify file exists
 				if !fileExists(scriptPath) {
 					t.Error("Created script file does not exist")
 				}
-				
+
 				// Verify content
 				content, err := os.ReadFile(scriptPath)
 				if err != nil {
@@ -206,7 +206,7 @@ func TestCreateTemporaryScript(t *testing.T) {
 				} else if string(content) != tt.content {
 					t.Errorf("Script content mismatch: got %q, want %q", content, tt.content)
 				}
-				
+
 				// Verify permissions on Unix
 				if runtime.GOOS != "windows" {
 					info, err := os.Stat(scriptPath)
@@ -216,7 +216,7 @@ func TestCreateTemporaryScript(t *testing.T) {
 						t.Errorf("Script permissions incorrect: %v", info.Mode())
 					}
 				}
-				
+
 				// Clean up
 				os.Remove(scriptPath)
 			}
@@ -232,11 +232,11 @@ func TestIsValidWindowsPath(t *testing.T) {
 	}{
 		// Note: The function currently rejects ALL colons, including drive letters
 		// This is overly restrictive but matches the current implementation
-		{`\\network\share`, true},  // UNC path without colon
-		{`\Users\test`, true},       // Relative path without colon
+		{`\\network\share`, true}, // UNC path without colon
+		{`\Users\test`, true},     // Relative path without colon
 		{`C:\invalid<path`, false},
 		{`C:\invalid>path`, false},
-		{`C:\invalid:path`, false},  // Extra colon is invalid
+		{`C:\invalid:path`, false}, // Extra colon is invalid
 		{`C:\invalid"path`, false},
 		{`C:\invalid|path`, false},
 		{`C:\invalid?path`, false},
@@ -259,20 +259,20 @@ func TestIsValidWindowsPath(t *testing.T) {
 func TestNewScriptCreationError(t *testing.T) {
 	cause := errors.New("permission denied")
 	err := newScriptCreationError(cause)
-	
+
 	autoCDErr := err
 	if autoCDErr == nil {
 		t.Fatal("newScriptCreationError should return *AutoCDError")
 	}
-	
+
 	if autoCDErr.Type != ErrorScriptGeneration {
 		t.Errorf("Error type = %v, want %v", autoCDErr.Type, ErrorScriptGeneration)
 	}
-	
+
 	if !strings.Contains(autoCDErr.Message, "script creation failed") {
 		t.Error("Error message should mention script creation")
 	}
-	
+
 	if autoCDErr.Cause != cause {
 		t.Error("Error cause not properly wrapped")
 	}
@@ -281,16 +281,16 @@ func TestNewScriptCreationError(t *testing.T) {
 func TestNewScriptExecutionError(t *testing.T) {
 	cause := errors.New("exec format error")
 	err := newScriptExecutionError(cause)
-	
+
 	autoCDErr := err
 	if autoCDErr == nil {
 		t.Fatal("newScriptExecutionError should return *AutoCDError")
 	}
-	
+
 	if autoCDErr.Type != ErrorScriptExecution {
 		t.Errorf("Error type = %v, want %v", autoCDErr.Type, ErrorScriptExecution)
 	}
-	
+
 	if !strings.Contains(autoCDErr.Message, "script execution failed") {
 		t.Error("Error message should mention script execution")
 	}
@@ -342,12 +342,12 @@ func TestDetectWindowsShell(t *testing.T) {
 	}
 
 	shell := detectWindowsShell()
-	
+
 	// Should always return a valid shell on Windows
 	if !shell.IsValid {
 		t.Error("detectWindowsShell should return valid shell on Windows")
 	}
-	
+
 	// Should be one of the Windows shell types
 	validTypes := []ShellType{ShellCmd, ShellPowerShell, ShellPowerShellCore}
 	found := false
@@ -357,11 +357,11 @@ func TestDetectWindowsShell(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Errorf("Unexpected shell type: %v", shell.Type)
 	}
-	
+
 	// Should have appropriate extension
 	if shell.Type == ShellCmd && shell.ScriptExt != ".bat" {
 		t.Error("CMD shell should have .bat extension")
@@ -378,19 +378,19 @@ func TestErrorClassification_FalseCases(t *testing.T) {
 	if IsPathError(nonPathErr) {
 		t.Error("IsPathError should return false for non-path errors")
 	}
-	
+
 	// Create non-shell error
 	nonShellErr := &AutoCDError{Type: ErrorScriptGeneration}
 	if IsShellError(nonShellErr) {
 		t.Error("IsShellError should return false for non-shell errors")
 	}
-	
+
 	// Create non-script error
 	nonScriptErr := &AutoCDError{Type: ErrorPathNotFound}
 	if IsScriptError(nonScriptErr) {
 		t.Error("IsScriptError should return false for non-script errors")
 	}
-	
+
 	// Test with non-AutoCDError
 	regularErr := errors.New("regular error")
 	if IsPathError(regularErr) || IsShellError(regularErr) || IsScriptError(regularErr) {
@@ -401,36 +401,36 @@ func TestErrorClassification_FalseCases(t *testing.T) {
 // Test cleanupOldScripts with actual files
 func TestCleanupOldScripts_WithRealFiles(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	// Create old and new autocd scripts
 	oldFile := filepath.Join(tempDir, "autocd_old.sh")
 	newFile := filepath.Join(tempDir, "autocd_new.sh")
 	notAutoCDFile := filepath.Join(tempDir, "other_file.sh")
-	
+
 	// Create files
 	for _, file := range []string{oldFile, newFile, notAutoCDFile} {
 		if err := os.WriteFile(file, []byte("test"), 0644); err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 	}
-	
+
 	// Make old file actually old
 	oldTime := time.Now().Add(-2 * time.Hour)
 	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
 		t.Fatalf("Failed to set old file time: %v", err)
 	}
-	
+
 	// Save original temp dir and temporarily override
 	originalTempDir := os.TempDir()
 	os.Setenv("TMPDIR", tempDir)
 	defer os.Setenv("TMPDIR", originalTempDir)
-	
+
 	// Run cleanup
 	err := cleanupOldScripts(1 * time.Hour)
 	if err != nil {
 		t.Errorf("cleanupOldScripts failed: %v", err)
 	}
-	
+
 	// Check results
 	if fileExists(oldFile) {
 		t.Error("Old autocd file should have been deleted")
@@ -483,13 +483,13 @@ func TestValidateStrict_AllCases(t *testing.T) {
 				os.MkdirAll(tt.path, 0755)
 				defer os.RemoveAll(tt.path)
 			}
-			
+
 			_, err := validateStrict(tt.path)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateStrict() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errType != nil {
 				if tt.errType == ErrSecurityViolation && !errors.Is(err, ErrSecurityViolation) {
 					t.Errorf("validateStrict() error type = %v, want %v", err, tt.errType)
@@ -502,18 +502,18 @@ func TestValidateStrict_AllCases(t *testing.T) {
 // Test fileExists edge cases
 func TestFileExists_DirectoryCase(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	// Test with directory (should return false)
 	if fileExists(tempDir) {
 		t.Error("fileExists should return false for directories")
 	}
-	
+
 	// Test with actual file
 	tempFile := filepath.Join(tempDir, "test.txt")
 	if err := os.WriteFile(tempFile, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
-	
+
 	if !fileExists(tempFile) {
 		t.Error("fileExists should return true for existing file")
 	}
@@ -524,12 +524,12 @@ func TestRegexPrecompilation(t *testing.T) {
 	// This tests that regex patterns compile successfully
 	windowsPattern := `[<>:"|?*\x00-\x1f]`
 	unixPattern := `[\x00-\x1f\x7f]`
-	
+
 	_, err1 := regexp.Compile(windowsPattern)
 	if err1 != nil {
 		t.Errorf("Windows regex pattern failed to compile: %v", err1)
 	}
-	
+
 	_, err2 := regexp.Compile(unixPattern)
 	if err2 != nil {
 		t.Errorf("Unix regex pattern failed to compile: %v", err2)
@@ -539,16 +539,16 @@ func TestRegexPrecompilation(t *testing.T) {
 // Test additional dangerous characters in validateNormal
 func TestValidateNormal_AdditionalCases(t *testing.T) {
 	dangerousChars := []string{";", "|", "&", "`", "$", "(", ")", "<", ">"}
-	
+
 	for _, char := range dangerousChars {
 		t.Run("char_"+char, func(t *testing.T) {
 			path := "/tmp/test" + char + "file"
 			_, err := validateNormal(path)
-			
+
 			if err == nil {
 				t.Errorf("validateNormal should reject path with %q character", char)
 			}
-			
+
 			if !errors.Is(err, ErrSecurityViolation) {
 				t.Errorf("Expected ErrSecurityViolation for dangerous character %q", char)
 			}
@@ -566,7 +566,7 @@ func TestSetExecutablePermissions_ErrorCase(t *testing.T) {
 		}
 		return
 	}
-	
+
 	// Test with non-existent file
 	err := SetExecutablePermissions("/non/existent/file")
 	if err == nil {
@@ -606,7 +606,7 @@ func TestClassifyUnixShell_AllTypes(t *testing.T) {
 // Test detectShell with shell override
 func TestDetectShell_WithOverride(t *testing.T) {
 	platform := detectPlatform()
-	
+
 	// Test with valid override
 	shell := detectShell(platform, "echo") // echo should exist on all systems
 	if _, err := exec.LookPath("echo"); err == nil {
@@ -614,7 +614,7 @@ func TestDetectShell_WithOverride(t *testing.T) {
 			t.Error("detectShell with valid override should return valid shell")
 		}
 	}
-	
+
 	// Test with invalid override
 	invalidShell := detectShell(platform, "/definitely/not/a/shell")
 	if invalidShell.IsValid {
@@ -627,18 +627,18 @@ func TestDetectUnixShell_EdgeCases(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix-only test")
 	}
-	
+
 	// Save original SHELL
 	originalShell := os.Getenv("SHELL")
 	defer os.Setenv("SHELL", originalShell)
-	
+
 	// Test with empty SHELL
 	os.Unsetenv("SHELL")
 	shell := detectUnixShell()
 	if shell.Path != "/bin/sh" {
 		t.Errorf("detectUnixShell with no SHELL env should default to /bin/sh, got %s", shell.Path)
 	}
-	
+
 	// Test with custom SHELL
 	os.Setenv("SHELL", "/usr/bin/fish")
 	shell = detectUnixShell()
@@ -650,8 +650,8 @@ func TestDetectUnixShell_EdgeCases(t *testing.T) {
 // Test IsRecoverable for all error types
 func TestIsRecoverable_AllErrorTypes(t *testing.T) {
 	tests := []struct {
-		errorType    ErrorType
-		recoverable  bool
+		errorType   ErrorType
+		recoverable bool
 	}{
 		{ErrorPathNotFound, true},
 		{ErrorPathNotDirectory, true},
@@ -668,7 +668,7 @@ func TestIsRecoverable_AllErrorTypes(t *testing.T) {
 			err := &AutoCDError{Type: tt.errorType}
 			got := err.IsRecoverable()
 			if got != tt.recoverable {
-				t.Errorf("IsRecoverable() for type %v = %v, want %v", 
+				t.Errorf("IsRecoverable() for type %v = %v, want %v",
 					tt.errorType, got, tt.recoverable)
 			}
 		})

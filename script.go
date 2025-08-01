@@ -88,23 +88,23 @@ func sanitizePathForShell(path string, shellType ShellType) string {
 	switch shellType {
 	case ShellCmd:
 		// Escape dangerous characters for batch files
-		path = strings.ReplaceAll(path, `"`, `""`)  // Escape quotes
-		path = strings.ReplaceAll(path, `;`, `^;`)  // Escape command separator
-		path = strings.ReplaceAll(path, `&`, `^&`)  // Escape command separator
-		path = strings.ReplaceAll(path, `|`, `^|`)  // Escape pipe
-		path = strings.ReplaceAll(path, `<`, `^<`)  // Escape input redirection
-		path = strings.ReplaceAll(path, `>`, `^>`)  // Escape output redirection
-		path = strings.ReplaceAll(path, `%`, `%%`)  // Escape variable expansion
+		path = strings.ReplaceAll(path, `"`, `""`) // Escape quotes
+		path = strings.ReplaceAll(path, `;`, `^;`) // Escape command separator
+		path = strings.ReplaceAll(path, `&`, `^&`) // Escape command separator
+		path = strings.ReplaceAll(path, `|`, `^|`) // Escape pipe
+		path = strings.ReplaceAll(path, `<`, `^<`) // Escape input redirection
+		path = strings.ReplaceAll(path, `>`, `^>`) // Escape output redirection
+		path = strings.ReplaceAll(path, `%`, `%%`) // Escape variable expansion
 		return path
 	case ShellPowerShell, ShellPowerShellCore:
 		// Escape dangerous characters for PowerShell
-		path = strings.ReplaceAll(path, `"`, `""`)   // Escape quotes
-		path = strings.ReplaceAll(path, `;`, "`;")   // Escape command separator
-		path = strings.ReplaceAll(path, `&`, "`&")   // Escape command separator
-		path = strings.ReplaceAll(path, `|`, "`|")   // Escape pipe
-		path = strings.ReplaceAll(path, `<`, "`<")   // Escape input redirection
-		path = strings.ReplaceAll(path, `>`, "`>")   // Escape output redirection
-		path = strings.ReplaceAll(path, `$`, "`$")   // Escape variable expansion
+		path = strings.ReplaceAll(path, `"`, `""`) // Escape quotes
+		path = strings.ReplaceAll(path, `;`, "`;") // Escape command separator
+		path = strings.ReplaceAll(path, `&`, "`&") // Escape command separator
+		path = strings.ReplaceAll(path, `|`, "`|") // Escape pipe
+		path = strings.ReplaceAll(path, `<`, "`<") // Escape input redirection
+		path = strings.ReplaceAll(path, `>`, "`>") // Escape output redirection
+		path = strings.ReplaceAll(path, `$`, "`$") // Escape variable expansion
 		return path
 	default:
 		// Escape for Unix shells

@@ -13,7 +13,6 @@ var (
 	ErrSecurityViolation = errors.New("security violation")
 )
 
-
 // Helper functions for common error cases
 func newPathError(errType ErrorType, path string, cause error) *AutoCDError {
 	return &AutoCDError{

@@ -14,19 +14,19 @@ func TestCheckShellDepth_Unix(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		shlvl             string
-		threshold         int
-		disableWarnings   bool
-		expectWarning     bool
-		expectedContains  []string
+		name             string
+		shlvl            string
+		threshold        int
+		disableWarnings  bool
+		expectWarning    bool
+		expectedContains []string
 	}{
 		{
-			name:             "below_threshold",
-			shlvl:            "5",
-			threshold:        15,
-			disableWarnings:  false,
-			expectWarning:    false,
+			name:            "below_threshold",
+			shlvl:           "5",
+			threshold:       15,
+			disableWarnings: false,
+			expectWarning:   false,
 		},
 		{
 			name:             "at_threshold",
@@ -45,11 +45,11 @@ func TestCheckShellDepth_Unix(t *testing.T) {
 			expectedContains: []string{"💡 Tip: You have 25 nested shells", "For better performance"},
 		},
 		{
-			name:            "custom_threshold",
-			shlvl:           "8",
-			threshold:       8,
-			disableWarnings: false,
-			expectWarning:   true,
+			name:             "custom_threshold",
+			shlvl:            "8",
+			threshold:        8,
+			disableWarnings:  false,
+			expectWarning:    true,
 			expectedContains: []string{"💡 Tip: You have 8 nested shells"},
 		},
 		{
@@ -211,10 +211,10 @@ func TestCheckShellDepth_Windows(t *testing.T) {
 // Test Options struct defaults for shell depth fields
 func TestOptions_ShellDepthDefaults(t *testing.T) {
 	tests := []struct {
-		name                     string
-		opts                     *Options
-		expectedThreshold        int
-		expectedDisableWarnings  bool
+		name                    string
+		opts                    *Options
+		expectedThreshold       int
+		expectedDisableWarnings bool
 	}{
 		{
 			name:                    "nil_options",

@@ -44,7 +44,7 @@ func TestValidateDirectory_FileInsteadOfDirectory(t *testing.T) {
 // Test security levels
 func TestPathValidation_SecurityLevels(t *testing.T) {
 	tempDir := os.TempDir()
-	
+
 	tests := []struct {
 		name  string
 		level SecurityLevel
@@ -53,7 +53,7 @@ func TestPathValidation_SecurityLevels(t *testing.T) {
 		{"strict", SecurityStrict},
 		{"permissive", SecurityPermissive},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateDirectory(tempDir, tt.level)
@@ -68,11 +68,11 @@ func TestPathValidation_SecurityLevels(t *testing.T) {
 func TestPathValidation_DangerousCharacters(t *testing.T) {
 	dangerousPaths := []string{
 		"/tmp/test; rm -rf /",
-		"/tmp/test|cat /etc/passwd", 
+		"/tmp/test|cat /etc/passwd",
 		"/tmp/test`whoami`",
 		"/tmp/test$(whoami)",
 	}
-	
+
 	for _, path := range dangerousPaths {
 		t.Run("dangerous_"+path, func(t *testing.T) {
 			err := ValidateDirectory(path, SecurityNormal)
@@ -97,11 +97,11 @@ func TestGetCurrentShellInfo(t *testing.T) {
 		t.Error("GetCurrentShellInfo returned nil")
 		return
 	}
-	
+
 	t.Logf("Detected shell: %s (type: %d)", shellInfo.Path, shellInfo.Type)
 	t.Logf("Script extension: %s", shellInfo.ScriptExt)
 	t.Logf("Shell valid: %v", shellInfo.IsValid)
-	
+
 	// Basic validation
 	if shellInfo.ScriptExt == "" {
 		t.Error("Script extension should not be empty")
@@ -114,7 +114,7 @@ func TestDirectoryExists(t *testing.T) {
 	if !DirectoryExists(tempDir) {
 		t.Errorf("DirectoryExists failed for valid directory: %s", tempDir)
 	}
-	
+
 	if DirectoryExists("/absolutely/nonexistent/path") {
 		t.Error("DirectoryExists should return false for non-existent directory")
 	}
@@ -125,7 +125,7 @@ func TestIsDirectoryAccessible(t *testing.T) {
 	if !IsDirectoryAccessible(tempDir) {
 		t.Errorf("IsDirectoryAccessible failed for accessible directory: %s", tempDir)
 	}
-	
+
 	if IsDirectoryAccessible("/absolutely/nonexistent/path") {
 		t.Error("IsDirectoryAccessible should return false for non-existent directory")
 	}
@@ -137,14 +137,14 @@ func TestGetTempDir(t *testing.T) {
 	if result != os.TempDir() {
 		t.Errorf("Expected system temp dir, got: %s", result)
 	}
-	
+
 	// Test with valid custom dir
 	validDir := os.TempDir()
 	result = GetTempDir(validDir)
 	if result != validDir {
 		t.Errorf("Expected %s, got %s", validDir, result)
 	}
-	
+
 	// Test with invalid custom dir
 	result = GetTempDir("/nonexistent/directory")
 	if result == "/nonexistent/directory" {
@@ -155,7 +155,7 @@ func TestGetTempDir(t *testing.T) {
 // Test script generation
 func TestGenerateScript_AllShellTypes(t *testing.T) {
 	testPath := "/tmp/test"
-	
+
 	shells := []*ShellInfo{
 		{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
 		{Path: "/bin/zsh", Type: ShellZsh, ScriptExt: ".sh", IsValid: true},
@@ -163,7 +163,7 @@ func TestGenerateScript_AllShellTypes(t *testing.T) {
 		{Path: "/bin/dash", Type: ShellDash, ScriptExt: ".sh", IsValid: true},
 		{Path: "/bin/sh", Type: ShellSh, ScriptExt: ".sh", IsValid: true},
 	}
-	
+
 	if runtime.GOOS == "windows" {
 		shells = append(shells, []*ShellInfo{
 			{Path: "cmd.exe", Type: ShellCmd, ScriptExt: ".bat", IsValid: true},
@@ -171,7 +171,7 @@ func TestGenerateScript_AllShellTypes(t *testing.T) {
 			{Path: "pwsh.exe", Type: ShellPowerShellCore, ScriptExt: ".ps1", IsValid: true},
 		}...)
 	}
-	
+
 	for _, shell := range shells {
 		t.Run(shell.Type.String(), func(t *testing.T) {
 			script, err := generateScript(testPath, shell)
@@ -192,29 +192,29 @@ func TestGenerateScript_AllShellTypes(t *testing.T) {
 // Test script path sanitization - verify quotes are properly escaped
 func TestScriptPathSanitization_QuoteEscaping(t *testing.T) {
 	pathWithQuotes := `/tmp/test"quoted"path`
-	
+
 	tests := []struct {
-		shell        *ShellInfo
-		shouldContain string
+		shell            *ShellInfo
+		shouldContain    string
 		shouldNotContain string
 	}{
 		{
-			shell: &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
-			shouldContain: `/tmp/test\"quoted\"path`, // Escaped quotes for Unix
-			shouldNotContain: `/tmp/test"quoted"path`, // Original unescaped quotes
+			shell:            &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
+			shouldContain:    `/tmp/test\"quoted\"path`, // Escaped quotes for Unix
+			shouldNotContain: `/tmp/test"quoted"path`,   // Original unescaped quotes
 		},
 		{
-			shell: &ShellInfo{Path: "cmd.exe", Type: ShellCmd, ScriptExt: ".bat", IsValid: true},
-			shouldContain: `/tmp/test""quoted""path`, // Doubled quotes for batch
-			shouldNotContain: `/tmp/test"quoted"path`, // Original unescaped quotes
+			shell:            &ShellInfo{Path: "cmd.exe", Type: ShellCmd, ScriptExt: ".bat", IsValid: true},
+			shouldContain:    `/tmp/test""quoted""path`, // Doubled quotes for batch
+			shouldNotContain: `/tmp/test"quoted"path`,   // Original unescaped quotes
 		},
 		{
-			shell: &ShellInfo{Path: "powershell.exe", Type: ShellPowerShell, ScriptExt: ".ps1", IsValid: true},
-			shouldContain: `/tmp/test""quoted""path`, // Doubled quotes for PowerShell
-			shouldNotContain: `/tmp/test"quoted"path`, // Original unescaped quotes
+			shell:            &ShellInfo{Path: "powershell.exe", Type: ShellPowerShell, ScriptExt: ".ps1", IsValid: true},
+			shouldContain:    `/tmp/test""quoted""path`, // Doubled quotes for PowerShell
+			shouldNotContain: `/tmp/test"quoted"path`,   // Original unescaped quotes
 		},
 	}
-	
+
 	for _, test := range tests {
 		t.Run(test.shell.Type.String(), func(t *testing.T) {
 			script, err := generateScript(pathWithQuotes, test.shell)
@@ -222,7 +222,7 @@ func TestScriptPathSanitization_QuoteEscaping(t *testing.T) {
 				t.Errorf("Script generation failed: %v", err)
 				return
 			}
-			
+
 			// Verify quotes are properly escaped
 			if !strings.Contains(script, test.shouldContain) {
 				t.Errorf("Script should contain escaped quotes: %s", test.shouldContain)
@@ -237,25 +237,25 @@ func TestScriptPathSanitization_QuoteEscaping(t *testing.T) {
 // Test platform-specific dangerous command injection
 func TestScriptPathSanitization_PlatformSpecific(t *testing.T) {
 	tests := []struct {
-		name            string
-		shell           *ShellInfo
-		dangerousPath   string
+		name             string
+		shell            *ShellInfo
+		dangerousPath    string
 		dangerousCommand string
 	}{
 		{
-			name: "unix_rm_command",
-			shell: &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
-			dangerousPath: `/tmp/test"; rm -rf /; echo "`,
+			name:             "unix_rm_command",
+			shell:            &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
+			dangerousPath:    `/tmp/test"; rm -rf /; echo "`,
 			dangerousCommand: `"; rm -rf /; echo "`,
 		},
 		{
-			name: "windows_rd_command", 
-			shell: &ShellInfo{Path: "cmd.exe", Type: ShellCmd, ScriptExt: ".bat", IsValid: true},
-			dangerousPath: `C:\temp\test"; rd /s /q C:\; echo "`,
+			name:             "windows_rd_command",
+			shell:            &ShellInfo{Path: "cmd.exe", Type: ShellCmd, ScriptExt: ".bat", IsValid: true},
+			dangerousPath:    `C:\temp\test"; rd /s /q C:\; echo "`,
 			dangerousCommand: `"; rd /s /q C:\; echo "`,
 		},
 	}
-	
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			script, err := generateScript(test.dangerousPath, test.shell)
@@ -263,12 +263,12 @@ func TestScriptPathSanitization_PlatformSpecific(t *testing.T) {
 				t.Errorf("Script generation failed: %v", err)
 				return
 			}
-			
+
 			// Verify the dangerous command sequence is not present in its original form
 			if strings.Contains(script, test.dangerousCommand) {
 				t.Errorf("Script contains unescaped dangerous command: %s", test.dangerousCommand)
 			}
-			
+
 			t.Logf("Generated script snippet: %s", script[0:min(200, len(script))])
 		})
 	}
@@ -298,7 +298,7 @@ func TestClassifyShellByPath(t *testing.T) {
 		{"pwsh.exe", ShellPowerShellCore},
 		{"/bin/unknown", ShellUnknown},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
 			result := classifyShellByPath(tt.path)
@@ -360,7 +360,7 @@ func TestUnusedFunctionIntegration(t *testing.T) {
 	if pathErr.Path != "/test" {
 		t.Error("newPathError should set correct path")
 	}
-	
+
 	// Test newPlatformUnsupportedError
 	platformErr := newPlatformUnsupportedError("unknown-os")
 	if platformErr.Type != ErrorPlatformUnsupported {
@@ -377,7 +377,7 @@ func TestAutoCDError_IsRecoverable(t *testing.T) {
 	if !recoverableErr.IsRecoverable() {
 		t.Error("Path not found error should be recoverable")
 	}
-	
+
 	unrecoverableErr := newPlatformUnsupportedError("test platform")
 	if unrecoverableErr.IsRecoverable() {
 		t.Error("Platform unsupported error should not be recoverable")
@@ -412,7 +412,7 @@ func TestPathValidation_EdgeCases(t *testing.T) {
 		{"path_traversal", "../../../etc", SecurityStrict, true},
 		{"very_long_path", strings.Repeat("a", 5000), SecurityStrict, true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := validateTargetPath(tt.path, tt.level)
@@ -431,25 +431,25 @@ func TestSetExecutablePermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping executable permissions test on Windows")
 	}
-	
+
 	tempFile, err := os.CreateTemp("", "autocd_perm_test_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	defer os.Remove(tempFile.Name())
 	tempFile.Close()
-	
+
 	err = SetExecutablePermissions(tempFile.Name())
 	if err != nil {
 		t.Errorf("SetExecutablePermissions failed: %v", err)
 	}
-	
-	// Check permissions  
+
+	// Check permissions
 	info, err := os.Stat(tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to stat file: %v", err)
 	}
-	
+
 	mode := info.Mode()
 	if mode&0111 == 0 {
 		t.Error("File is not executable after SetExecutablePermissions")

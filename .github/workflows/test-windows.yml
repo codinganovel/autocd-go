@@ -1,0 +1,173 @@
+name: Test AutoCD on Windows
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Create test directory
+      run: mkdir test_windows
+    
+    - name: Create test application
+      run: |
+        cd test_windows
+        
+        # Create the test app
+        @"
+        package main
+        
+        import (
+        	"fmt"
+        	"os"
+        	"github.com/codinganovel/autocd-go"
+        )
+        
+        func getCurrentDir() string {
+        	wd, err := os.Getwd()
+        	if err != nil {
+        		return "unknown"
+        	}
+        	return wd
+        }
+        
+        func main() {
+        	if len(os.Args) != 2 {
+        		fmt.Fprintf(os.Stderr, "Usage: %s <directory>\n", os.Args[0])
+        		fmt.Fprintf(os.Stderr, "Example: %s C:\\Windows\\Temp\n", os.Args[0])
+        		os.Exit(1)
+        	}
+        
+        	targetDir := os.Args[1]
+        	
+        	fmt.Printf("=== AutoCD Windows Test ===\n")
+        	fmt.Printf("Current directory: %s\n", getCurrentDir())
+        	fmt.Printf("Target directory: %s\n", targetDir)
+        	fmt.Printf("Platform check: Supported = %v\n", autocd.IsSupported())
+        	
+        	shellInfo := autocd.GetCurrentShellInfo()
+        	if shellInfo != nil {
+        		fmt.Printf("Detected shell: %s (type: %v, ext: %s, valid: %v)\n", 
+        			shellInfo.Path, shellInfo.Type, shellInfo.ScriptExt, shellInfo.IsValid)
+        	}
+        	
+        	fmt.Printf("About to call ExitWithDirectory()...\n")
+        	fmt.Printf("If this works, the process will be replaced and you won't see the 'BUG' message below.\n")
+        	
+        	// This should replace the process and never return
+        	if err := autocd.ExitWithDirectory(targetDir); err != nil {
+        		fmt.Printf("❌ Error: %v\n", err)
+        		os.Exit(1)
+        	}
+        	
+        	// This should NEVER execute if process replacement works
+        	fmt.Printf("❌ BUG: Process was NOT replaced - this line should never be reached!\n")
+        	fmt.Printf("Still in directory: %s\n", getCurrentDir())
+        }
+        "@ | Out-File -FilePath test_app.go -Encoding UTF8
+        
+        # Initialize Go module
+        go mod init test-app
+        go mod edit -replace github.com/codinganovel/autocd-go=../
+        go get github.com/codinganovel/autocd-go
+      shell: powershell
+    
+    - name: Build test application
+      run: |
+        cd test_windows
+        go build -o test_app.exe test_app.go
+      shell: powershell
+    
+    - name: Test with valid directory (no debug)
+      run: |
+        cd test_windows
+        echo "=== TEST 1: Basic functionality ==="
+        ./test_app.exe C:\Windows\Temp
+      shell: powershell
+      continue-on-error: true  # Don't fail the workflow if this step fails
+    
+    - name: Test with valid directory (debug mode)
+      run: |
+        cd test_windows
+        echo "=== TEST 2: Debug mode ==="
+        $env:AUTOCD_DEBUG = "1"
+        ./test_app.exe C:\Windows\Temp
+      shell: powershell
+      continue-on-error: true
+    
+    - name: Test with current directory
+      run: |
+        cd test_windows
+        echo "=== TEST 3: Current directory ==="
+        ./test_app.exe .
+      shell: powershell
+      continue-on-error: true
+    
+    - name: Test with invalid directory
+      run: |
+        cd test_windows
+        echo "=== TEST 4: Invalid directory (should show error) ==="
+        ./test_app.exe C:\NonExistentDirectory12345
+      shell: powershell
+      continue-on-error: true
+    
+    - name: Test shell detection
+      run: |
+        cd test_windows
+        echo "=== TEST 5: Shell detection only ==="
+        
+        # Create a minimal test that just shows detection
+        @"
+        package main
+        import (
+        	"fmt"
+        	"github.com/codinganovel/autocd-go"
+        )
+        func main() {
+        	fmt.Printf("Platform supported: %v\n", autocd.IsSupported())
+        	shell := autocd.GetCurrentShellInfo()
+        	if shell != nil {
+        		fmt.Printf("Shell path: %s\n", shell.Path)
+        		fmt.Printf("Shell type: %v\n", shell.Type)
+        		fmt.Printf("Script ext: %s\n", shell.ScriptExt)
+        		fmt.Printf("Is valid: %v\n", shell.IsValid)
+        	} else {
+        		fmt.Printf("No shell detected\n")
+        	}
+        }
+        "@ | Out-File -FilePath detect_test.go -Encoding UTF8
+        
+        go build -o detect_test.exe detect_test.go
+        ./detect_test.exe
+      shell: powershell
+    
+    - name: Show environment info
+      run: |
+        echo "=== ENVIRONMENT INFO ==="
+        echo "PowerShell version:"
+        $PSVersionTable.PSVersion
+        echo ""
+        echo "Available shells:"
+        Get-Command cmd -ErrorAction SilentlyContinue | Select-Object Source
+        Get-Command powershell -ErrorAction SilentlyContinue | Select-Object Source  
+        Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object Source
+        echo ""
+        echo "Environment variables:"
+        echo "COMSPEC: $env:COMSPEC"
+        echo "SHELL: $env:SHELL"
+        echo "WINDIR: $env:WINDIR"
+      shell: powershell

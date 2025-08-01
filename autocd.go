@@ -16,27 +16,27 @@ func checkShellDepth(opts *Options) {
 	}
 
 	platform := detectPlatform()
-	
+
 	if platform == PlatformWindows {
 		// Windows: Always show warning (unreliable detection)
 		fmt.Fprintf(os.Stderr, "💡 Shell nesting detection is not reliable on Windows.\n")
 		fmt.Fprintf(os.Stderr, "Close and reopen your terminal from time to time to ensure optimal performance.\n")
 		return
 	}
-	
+
 	// Unix systems: Check SHLVL environment variable
 	shlvlStr := os.Getenv("SHLVL")
 	if shlvlStr == "" {
 		// No SHLVL means likely not in a shell or shell doesn't support it
 		return
 	}
-	
+
 	shlvl, err := strconv.Atoi(shlvlStr)
 	if err != nil {
 		// Invalid SHLVL value, skip warning
 		return
 	}
-	
+
 	// Show warning if above threshold
 	if shlvl >= opts.DepthWarningThreshold {
 		fmt.Fprintf(os.Stderr, "💡 Tip: You have %d nested shells from navigation.\n", shlvl)

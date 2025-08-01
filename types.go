@@ -45,7 +45,7 @@ type ShellInfo struct {
 
 // Options provides configuration for ExitWithDirectoryAdvanced
 type Options struct {
-	Shell                  string        // Override shell detection ("", "bash", "cmd", etc.)
+	Shell                 string        // Override shell detection ("", "bash", "cmd", etc.)
 	SecurityLevel         SecurityLevel // Strict, Normal, Permissive
 	DebugMode             bool          // Enable verbose logging to stderr
 	TempDir               string        // Override temp directory ("" = system default)

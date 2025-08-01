@@ -43,12 +43,12 @@ func executeWindowsScript(scriptPath string, shell *ShellInfo) error {
 		Env:   os.Environ(),
 		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd()},
 	}
-	
+
 	_, _, err := syscall.StartProcess(executable, args, attr)
 	if err != nil {
 		return err
 	}
-	
+
 	// Exit current process after starting the new shell
 	os.Exit(0)
 	return nil
