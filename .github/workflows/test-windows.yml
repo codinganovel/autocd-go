@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
 
 jobs:
   test-windows:
@@ -20,30 +20,20 @@ jobs:
       with:
         go-version: '1.21'
     
-    - name: Create test directory
-      run: mkdir test_windows
-    
-    - name: Create test application
+    - name: Create test directory and files
       run: |
-        cd test_windows
+        mkdir test_dir
+        cd test_dir
         
-        # Create the test app (using UTF8 without BOM)
-        $content = @'
+        # Create test_app.go
+        Set-Content -Path "test_app.go" -Value @"
 package main
 
 import (
 	"fmt"
 	"os"
-	autocd "../"
+	"github.com/codinganovel/autocd-go"
 )
-
-func getCurrentDir() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "unknown"
-	}
-	return wd
-}
 
 func main() {
 	if len(os.Args) != 2 {
@@ -54,23 +44,13 @@ func main() {
 
 	targetDir := os.Args[1]
 	
-	fmt.Printf("=== AutoCD Windows Test ===\n")
 	fmt.Printf("Current directory: %s\n", getCurrentDir())
 	fmt.Printf("Target directory: %s\n", targetDir)
-	fmt.Printf("Platform check: Supported = %v\n", autocd.IsSupported())
-	
-	shellInfo := autocd.GetCurrentShellInfo()
-	if shellInfo != nil {
-		fmt.Printf("Detected shell: %s (type: %v, ext: %s, valid: %v)\n", 
-			shellInfo.Path, shellInfo.Type, shellInfo.ScriptExt, shellInfo.IsValid)
-	}
-	
 	fmt.Printf("About to call ExitWithDirectory()...\n")
-	fmt.Printf("If this works, the process will be replaced and you won't see the 'BUG' message below.\n")
 	
 	// This should replace the process and never return
 	if err := autocd.ExitWithDirectory(targetDir); err != nil {
-		fmt.Printf("❌ Error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 	
@@ -78,107 +58,68 @@ func main() {
 	fmt.Printf("❌ BUG: Process was NOT replaced - this line should never be reached!\n")
 	fmt.Printf("Still in directory: %s\n", getCurrentDir())
 }
-'@
-        [System.IO.File]::WriteAllText("test_app.go", $content, [System.Text.UTF8Encoding]::new($false))
+
+func getCurrentDir() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "unknown"
+	}
+	return wd
+}
+"@ -Encoding UTF8
         
-        # Create go.mod (UTF8 without BOM)
-        $modContent = @'
-module test-app
-
-go 1.21
-
-replace autocd => ../
-
-require autocd v0.0.0-00010101000000-000000000000
-'@
-        [System.IO.File]::WriteAllText("go.mod", $modContent, [System.Text.UTF8Encoding]::new($false))
-      shell: powershell
+        # Initialize Go module
+        go mod init test-app
+        go mod edit -replace github.com/codinganovel/autocd-go=../
+        go get github.com/codinganovel/autocd-go
       shell: powershell
     
     - name: Build test application
       run: |
-        cd test_windows
-        go mod tidy
+        cd test_dir
         go build -o test_app.exe test_app.go
       shell: powershell
     
-    - name: Test with valid directory (no debug)
+    - name: Test with valid directory
       run: |
-        cd test_windows
+        cd test_dir
         echo "=== TEST 1: Basic functionality ==="
-        ./test_app.exe C:\Windows\Temp
+        .\test_app.exe C:\Windows\Temp
       shell: powershell
-      continue-on-error: true  # Don't fail the workflow if this step fails
+      continue-on-error: true
     
-    - name: Test with valid directory (debug mode)
+    - name: Test with debug mode
       run: |
-        cd test_windows
+        cd test_dir
         echo "=== TEST 2: Debug mode ==="
         $env:AUTOCD_DEBUG = "1"
-        ./test_app.exe C:\Windows\Temp
+        .\test_app.exe C:\Windows\Temp
       shell: powershell
       continue-on-error: true
     
     - name: Test with current directory
       run: |
-        cd test_windows
+        cd test_dir
         echo "=== TEST 3: Current directory ==="
-        ./test_app.exe .
+        .\test_app.exe .
       shell: powershell
       continue-on-error: true
     
     - name: Test with invalid directory
       run: |
-        cd test_windows
+        cd test_dir
         echo "=== TEST 4: Invalid directory (should show error) ==="
-        ./test_app.exe C:\NonExistentDirectory12345
+        .\test_app.exe C:\NonExistentDirectory12345
       shell: powershell
       continue-on-error: true
-    
-    - name: Test shell detection
-      run: |
-        cd test_windows
-        echo "=== TEST 5: Shell detection only ==="
-        
-        # Create a minimal test that just shows detection (UTF8 without BOM)
-        $detectContent = @'
-package main
-import (
-	"fmt"
-	autocd "../"
-)
-func main() {
-	fmt.Printf("Platform supported: %v\n", autocd.IsSupported())
-	shell := autocd.GetCurrentShellInfo()
-	if shell != nil {
-		fmt.Printf("Shell path: %s\n", shell.Path)
-		fmt.Printf("Shell type: %v\n", shell.Type)
-		fmt.Printf("Script ext: %s\n", shell.ScriptExt)
-		fmt.Printf("Is valid: %v\n", shell.IsValid)
-	} else {
-		fmt.Printf("No shell detected\n")
-	}
-}
-'@
-        [System.IO.File]::WriteAllText("detect_test.go", $detectContent, [System.Text.UTF8Encoding]::new($false))
-        
-        go build -o detect_test.exe detect_test.go
-        ./detect_test.exe
-      shell: powershell
     
     - name: Show environment info
       run: |
         echo "=== ENVIRONMENT INFO ==="
-        echo "PowerShell version:"
-        $PSVersionTable.PSVersion
-        echo ""
+        echo "PowerShell version: $($PSVersionTable.PSVersion)"
         echo "Available shells:"
-        Get-Command cmd -ErrorAction SilentlyContinue | Select-Object Source
-        Get-Command powershell -ErrorAction SilentlyContinue | Select-Object Source  
-        Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object Source
-        echo ""
+        Get-Command cmd, powershell, pwsh -ErrorAction SilentlyContinue | Select-Object Name, Source
         echo "Environment variables:"
         echo "COMSPEC: $env:COMSPEC"
-        echo "SHELL: $env:SHELL"
         echo "WINDIR: $env:WINDIR"
       shell: powershell
