@@ -45,12 +45,12 @@ Instead of complex shell monitoring or protocols, the library uses a simple but 
 
 ### Example Transition Script (Unix)
 ```bash
-#!/bin/bash
+#!/bin/sh
 # autocd transition script - auto-cleanup on exit
 trap 'rm -f "$0" 2>/dev/null || true' EXIT INT TERM
 
-TARGET_DIR="/final/directory"
-SHELL_PATH="/bin/bash"
+TARGET_DIR='/final/directory'
+SHELL_PATH='/bin/bash'
 
 # Attempt to change directory with error handling
 if cd "$TARGET_DIR" 2>/dev/null; then
@@ -92,8 +92,8 @@ generateScript() � createTemporaryScript() � executeScript() � syscall.Exe
 | `autocd.go` | Main API and orchestration | `ExitWithDirectory`, `ExitWithDirectoryAdvanced`, `ExitWithDirectoryOrFallback` |
 | `types.go` | Type definitions and constants | All structs, enums, and constants |
 | `validation.go` | Path validation with security levels | `validateTargetPath`, `validateStrict`, `validateNormal`, `validatePermissive` |
-| `shell.go` | Shell detection and configuration | `detectShell`, `detectUnixShell`, `classifyShell` |
-| `script.go` | Script generation for Unix shells | `generateScript`, `generateUnixScript`, `sanitizePathForShell` |
+| `shell.go` | Shell detection and configuration | `detectShell`, `detectUnixShell`, `validateShellOverride` |
+| `script.go` | POSIX script generation | `generateScript`, `generateUnixScript`, `sanitizePathForShell` |
 | `exec.go` | Process replacement via syscall.Exec | `executeScript`, `ExecReplacement` |
 | `tempfile.go` | Temporary file management and utilities | `createTemporaryScript`, `CleanupOldScripts`, `DirectoryExists` |
 | `errors.go` | Structured error handling | `AutoCDError`, error type classification functions |
@@ -351,27 +351,11 @@ The shell depth system includes comprehensive test coverage in `shell_depth_test
 
 The library uses a simplified approach for Unix systems:
 
-1. **SHELL environment variable** - User's preferred shell
-2. **Fallback** to `/bin/sh` (POSIX standard)
+1. **Shell override** - If specified in Options
+2. **SHELL environment variable** - User's preferred shell
+3. **Fallback** to `/bin/sh` (POSIX standard)
 
-### Shell Classification
-```go
-func classifyShell(shellPath string) ShellType {
-    basename := filepath.Base(shellPath)
-    switch {
-    case strings.Contains(basename, "bash"):
-        return ShellBash
-    case strings.Contains(basename, "zsh"):
-        return ShellZsh
-    case strings.Contains(basename, "fish"):
-        return ShellFish
-    case strings.Contains(basename, "dash"):
-        return ShellDash
-    default:
-        return ShellSh  // Generic sh-compatible
-    }
-}
-```
+All shells are treated identically - the library always generates POSIX scripts executed with `/bin/sh`, which then exec into the user's preferred shell.
 
 ## Security Model
 
@@ -381,18 +365,12 @@ The library implements a three-tier security model for path validation:
 **Use Case:** Paranoid environments, security-critical applications.
 
 **Restrictions:**
-- L No path traversal (`..` sequences)
-- L Character whitelist validation
-- L Length limits (4096 chars for Unix filesystems)
-- L Strict character validation
+- Character whitelist validation (no control characters)
+- Length limits (4096 chars for Unix filesystems)
+- Directory must exist and be accessible
 
 ```go
 func validateStrict(path string) (string, error) {
-    // No path traversal
-    if strings.Contains(path, "..") {
-        return "", ErrSecurityViolation
-    }
-    
     // Character whitelist validation
     if !isValidUnixPath(path) {
         return "", ErrSecurityViolation
@@ -411,24 +389,18 @@ func validateStrict(path string) (string, error) {
 **Use Case:** Most applications, balanced security and usability.
 
 **Restrictions:**
-- L Path traversal prevention via `filepath.Clean`
-- L Shell injection character filtering: `;|&`$()<>`
--  Standard directory paths allowed
+- Path cleaning via `filepath.Clean`
+- Null byte prevention (can't exist in valid paths)
+- Directory must exist and be accessible
 
 ```go
 func validateNormal(path string) (string, error) {
-    // Prevent obvious path traversal
+    // Clean the path first
     cleanPath := filepath.Clean(path)
-    if strings.Contains(cleanPath, "../") || strings.Contains(cleanPath, "..\\\\") {
-        return "", ErrSecurityViolation
-    }
     
-    // Basic shell injection prevention
-    dangerous := []string{";", "|", "&", "`", "$", "(", ")", "<", ">"}
-    for _, char := range dangerous {
-        if strings.Contains(path, char) {
-            return "", ErrSecurityViolation
-        }
+    // Check for null bytes which can't be in valid paths
+    if strings.Contains(path, "\x00") {
+        return "", ErrSecurityViolation
     }
     
     return cleanPath, nil
@@ -450,16 +422,17 @@ func validatePermissive(path string) (string, error) {
 
 ### Shell Injection Prevention
 
-The library sanitizes paths differently for each shell type:
+The library uses single-quote escaping for all paths, providing robust protection:
 
 ```go
-func sanitizePathForShell(path string, shellType ShellType) string {
-    // Escape for Unix shells
-    path = strings.ReplaceAll(path, `\`, `\\`)
-    path = strings.ReplaceAll(path, `"`, `\"`)
-    return path
+func sanitizePathForShell(path string) string {
+    // Use single quotes for robust escaping
+    // Only need to escape embedded single quotes as '"'"'
+    return strings.ReplaceAll(path, `'`, `'"'"'`)
 }
 ```
+
+Paths are wrapped in single quotes in the generated scripts, preventing shell interpretation of special characters.
 
 ## Script Generation
 
@@ -467,12 +440,12 @@ The library generates platform and shell-specific transition scripts:
 
 ### Unix Script Template
 ```bash
-#!/bin/bash  # or appropriate shebang
+#!/bin/sh
 # autocd transition script - auto-cleanup on exit
 trap 'rm -f "$0" 2>/dev/null || true' EXIT INT TERM
 
-TARGET_DIR="/path/to/directory"
-SHELL_PATH="/bin/bash"
+TARGET_DIR='/path/to/directory'
+SHELL_PATH='/bin/bash'
 
 # Attempt to change directory with error handling
 if cd "$TARGET_DIR" 2>/dev/null; then
@@ -486,25 +459,11 @@ fi
 exec "$SHELL_PATH"
 ```
 
-
-
-### Shebang Selection
-```go
-func getShebang(shellType ShellType) string {
-    switch shellType {
-    case ShellBash:
-        return "#!/bin/bash"
-    case ShellZsh:
-        return "#!/bin/zsh"
-    case ShellFish:
-        return "#!/usr/bin/fish"
-    case ShellDash:
-        return "#!/bin/dash"
-    default:
-        return "#!/bin/sh"
-    }
-}
-```
+**Key Implementation Points:**
+- Always uses `#!/bin/sh` shebang for POSIX compatibility
+- Scripts are executed with `/bin/sh` regardless of user's shell (fixes Fish compatibility)
+- Single quotes protect paths from shell injection
+- The script execs into the user's preferred shell at the end
 
 ## Error Handling
 
@@ -725,9 +684,11 @@ func CleanupOldScriptsWithAge(maxAge time.Duration) error
 
 ### Unix Implementation
 ```go
-func executeUnixScript(scriptPath string, shell *ShellInfo) error {
-    executable := shell.Path  // e.g., "/bin/bash"
-    args := []string{shell.Path, scriptPath}
+func executeScript(scriptPath string, shell *ShellInfo, debugMode bool) error {
+    // Always use /bin/sh to execute our POSIX script
+    // The script will exec into the user's shell at the end
+    executable := "/bin/sh"
+    args := []string{executable, scriptPath}
     
     // Replace current process with the script
     return syscall.Exec(executable, args, os.Environ())

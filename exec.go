@@ -9,12 +9,14 @@ import (
 // executeScript replaces current process with script using Unix syscall.Exec
 func executeScript(scriptPath string, shell *ShellInfo, debugMode bool) error {
 	if debugMode {
-		fmt.Fprintf(os.Stderr, "autocd: executing script %s with shell %s\n", scriptPath, shell.Path)
+		fmt.Fprintf(os.Stderr, "autocd: executing script %s (target shell: %s)\n", scriptPath, shell.Path)
 	}
 
-	// Use the detected shell to execute the script
-	executable := shell.Path
-	args := []string{shell.Path, scriptPath}
+	// Always use /bin/sh to execute our POSIX script, regardless of user's shell
+	// This fixes fish compatibility and other exotic shells
+	// The script will exec into the user's shell at the end
+	executable := "/bin/sh"
+	args := []string{executable, scriptPath}
 
 	// Replace current process with Unix syscall.Exec
 	return syscall.Exec(executable, args, os.Environ())
@@ -28,10 +30,10 @@ func ExecReplacement(scriptPath string, shell *ShellInfo, debugMode bool) error 
 		return newPathError(ErrorPathNotFound, "", fmt.Errorf("script path is empty"))
 	}
 	if shell == nil {
-		return fmt.Errorf("shell info is nil")
+		return newShellDetectionError("shell info is nil")
 	}
 	if !shell.IsValid {
-		return fmt.Errorf("shell is not valid: %s", shell.Path)
+		return newShellDetectionError(fmt.Sprintf("shell is not valid: %s", shell.Path))
 	}
 
 	// Check that script file exists

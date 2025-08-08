@@ -1,35 +1,5 @@
 package autocd
 
-// ShellType represents different shell types
-type ShellType int
-
-const (
-	ShellUnknown ShellType = iota
-	ShellBash
-	ShellZsh
-	ShellFish
-	ShellDash
-	ShellSh
-)
-
-// String returns the string representation of the ShellType
-func (s ShellType) String() string {
-	switch s {
-	case ShellBash:
-		return "bash"
-	case ShellZsh:
-		return "zsh"
-	case ShellFish:
-		return "fish"
-	case ShellDash:
-		return "dash"
-	case ShellSh:
-		return "sh"
-	default:
-		return "unknown"
-	}
-}
-
 // SecurityLevel defines path validation strictness
 type SecurityLevel int
 
@@ -41,10 +11,8 @@ const (
 
 // ShellInfo contains detected shell information
 type ShellInfo struct {
-	Path      string    // Full path to shell executable
-	Type      ShellType // Detected shell type
-	ScriptExt string    // Script file extension (.sh)
-	IsValid   bool      // Whether shell exists and is executable
+	Path    string // Full path to shell executable
+	IsValid bool   // Whether shell exists and is executable
 }
 
 // Options provides configuration for ExitWithDirectoryAdvanced

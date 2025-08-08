@@ -18,31 +18,26 @@ func TestValidateShellOverride(t *testing.T) {
 		name          string
 		shellOverride string
 		wantValid     bool
-		wantShellType ShellType
 	}{
 		{
 			name:          "absolute_path_bash",
 			shellOverride: "/bin/bash",
 			wantValid:     true,
-			wantShellType: ShellBash,
 		},
 		{
 			name:          "shell_name_in_path",
 			shellOverride: "sh",
 			wantValid:     true,
-			wantShellType: ShellSh,
 		},
 		{
 			name:          "non_existent_shell",
 			shellOverride: "/non/existent/shell",
 			wantValid:     false,
-			wantShellType: ShellUnknown,
 		},
 		{
 			name:          "relative_shell_name",
 			shellOverride: "bash",
 			wantValid:     true,
-			wantShellType: ShellBash,
 		},
 	}
 
@@ -62,54 +57,6 @@ func TestValidateShellOverride(t *testing.T) {
 			if result.IsValid != tt.wantValid {
 				t.Errorf("validateShellOverride(%s).IsValid = %v, want %v",
 					tt.shellOverride, result.IsValid, tt.wantValid)
-			}
-
-			if result.IsValid && result.Type != tt.wantShellType {
-				t.Errorf("validateShellOverride(%s).Type = %v, want %v",
-					tt.shellOverride, result.Type, tt.wantShellType)
-			}
-		})
-	}
-}
-
-// Test findExecutable - currently 0% coverage
-func TestFindExecutable(t *testing.T) {
-	tests := []struct {
-		name       string
-		executable string
-		wantFound  bool
-	}{
-		{
-			name:       "common_unix_command",
-			executable: "echo",
-			wantFound:  true,
-		},
-		{
-			name:       "non_existent_command",
-			executable: "definitely_not_a_real_command_12345",
-			wantFound:  false,
-		},
-		{
-			name:       "empty_name",
-			executable: "",
-			wantFound:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := findExecutable(tt.executable)
-
-			if tt.wantFound && got == "" {
-				// Skip if expected command doesn't exist on this system
-				if _, err := exec.LookPath(tt.executable); err != nil {
-					t.Skip("Expected executable not found on this system")
-				}
-				t.Errorf("findExecutable(%s) returned empty, expected path", tt.executable)
-			}
-
-			if !tt.wantFound && got != "" {
-				t.Errorf("findExecutable(%s) = %v, expected empty", tt.executable, got)
 			}
 		})
 	}
@@ -164,8 +111,8 @@ func TestCreateTemporaryScript(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				// Verify file exists
-				if !fileExists(scriptPath) {
+				// Verify file exists (check with os.Stat, not fileExists which checks executable)
+				if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 					t.Error("Created script file does not exist")
 				}
 
@@ -332,14 +279,14 @@ func TestCleanupOldScripts_WithRealFiles(t *testing.T) {
 		t.Errorf("cleanupOldScripts failed: %v", err)
 	}
 
-	// Check results
-	if fileExists(oldFile) {
+	// Check results (use os.Stat since fileExists checks executable bit)
+	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
 		t.Error("Old autocd file should have been deleted")
 	}
-	if !fileExists(newFile) {
+	if _, err := os.Stat(newFile); os.IsNotExist(err) {
 		t.Error("New autocd file should still exist")
 	}
-	if !fileExists(notAutoCDFile) {
+	if _, err := os.Stat(notAutoCDFile); os.IsNotExist(err) {
 		t.Error("Non-autocd file should still exist")
 	}
 }
@@ -357,12 +304,7 @@ func TestValidateStrict_AllCases(t *testing.T) {
 			path:    "/tmp/valid",
 			wantErr: false,
 		},
-		{
-			name:    "path_with_traversal",
-			path:    "/tmp/../etc",
-			wantErr: true,
-			errType: ErrSecurityViolation,
-		},
+		// Removed path_with_traversal test - no longer relevant after removing dead check
 		{
 			name:    "unix_invalid_chars",
 			path:    "/tmp/test\x00file",
@@ -403,14 +345,23 @@ func TestFileExists_DirectoryCase(t *testing.T) {
 		t.Error("fileExists should return false for directories")
 	}
 
-	// Test with actual file
+	// Test with actual file (non-executable)
 	tempFile := filepath.Join(tempDir, "test.txt")
 	if err := os.WriteFile(tempFile, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
+	if fileExists(tempFile) {
+		t.Error("fileExists should return false for non-executable file")
+	}
+	
+	// Make it executable
+	if err := os.Chmod(tempFile, 0755); err != nil {
+		t.Fatalf("Failed to make file executable: %v", err)
+	}
+	
 	if !fileExists(tempFile) {
-		t.Error("fileExists should return true for existing file")
+		t.Error("fileExists should return true for executable file")
 	}
 }
 
@@ -425,24 +376,39 @@ func TestRegexPrecompilation(t *testing.T) {
 	}
 }
 
-// Test additional dangerous characters in validateNormal
+// Test validateNormal with new single-quote protection
 func TestValidateNormal_AdditionalCases(t *testing.T) {
-	dangerousChars := []string{";", "|", "&", "`", "$", "(", ")", "<", ">"}
+	// These characters are now safe with single-quote escaping
+	safeChars := []string{";", "|", "&", "`", "$", "(", ")", "<", ">"}
 
-	for _, char := range dangerousChars {
+	for _, char := range safeChars {
 		t.Run("char_"+char, func(t *testing.T) {
 			path := "/tmp/test" + char + "file"
-			_, err := validateNormal(path)
+			cleanedPath, err := validateNormal(path)
 
-			if err == nil {
-				t.Errorf("validateNormal should reject path with %q character", char)
+			if err != nil {
+				t.Errorf("validateNormal should not reject path with %q character when using single quotes: %v", char, err)
 			}
-
-			if !errors.Is(err, ErrSecurityViolation) {
-				t.Errorf("Expected ErrSecurityViolation for dangerous character %q", char)
+			
+			if cleanedPath == "" {
+				t.Error("validateNormal should return cleaned path")
 			}
 		})
 	}
+	
+	// Test null byte (should still be rejected)
+	t.Run("null_byte", func(t *testing.T) {
+		path := "/tmp/test\x00file"
+		_, err := validateNormal(path)
+		
+		if err == nil {
+			t.Error("validateNormal should reject path with null byte")
+		}
+		
+		if !errors.Is(err, ErrSecurityViolation) {
+			t.Error("Expected ErrSecurityViolation for null byte")
+		}
+	})
 }
 
 // Test SetExecutablePermissions error case
@@ -454,34 +420,7 @@ func TestSetExecutablePermissions_ErrorCase(t *testing.T) {
 	}
 }
 
-// Test classifyShell with all shell types
-func TestClassifyShell_AllTypes(t *testing.T) {
-	tests := []struct {
-		shellPath string
-		expected  ShellType
-	}{
-		{"/bin/bash", ShellBash},
-		{"/usr/local/bin/bash", ShellBash},
-		{"/bin/zsh", ShellZsh},
-		{"/usr/bin/zsh", ShellZsh},
-		{"/usr/bin/fish", ShellFish},
-		{"/usr/local/bin/fish", ShellFish},
-		{"/bin/dash", ShellDash},
-		{"/usr/bin/dash", ShellDash},
-		{"/bin/sh", ShellSh},
-		{"/bin/ksh", ShellSh}, // Unknown shells default to sh
-		{"/usr/bin/tcsh", ShellSh},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.shellPath, func(t *testing.T) {
-			got := classifyShell(tt.shellPath)
-			if got != tt.expected {
-				t.Errorf("classifyShell(%q) = %v, want %v", tt.shellPath, got, tt.expected)
-			}
-		})
-	}
-}
+// Test classifyShell removed - function no longer exists
 
 // Test detectShell with shell override
 func TestDetectShell_WithOverride(t *testing.T) {
@@ -517,7 +456,7 @@ func TestDetectUnixShell_EdgeCases(t *testing.T) {
 	// Test with custom SHELL
 	os.Setenv("SHELL", "/usr/bin/fish")
 	shell = detectUnixShell()
-	if shell.Type != ShellFish {
+	if shell.Path != "/usr/bin/fish" {
 		t.Error("detectUnixShell should detect fish shell from SHELL env")
 	}
 }

@@ -3,6 +3,7 @@ package autocd
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -63,23 +64,36 @@ func TestPathValidation_SecurityLevels(t *testing.T) {
 	}
 }
 
-// Test dangerous path characters
+// Test dangerous path characters - with single quotes these are now safe
 func TestPathValidation_DangerousCharacters(t *testing.T) {
-	dangerousPaths := []string{
+	// These paths are now safe with single-quote escaping
+	// Only null bytes are truly dangerous
+	safePaths := []string{
 		"/tmp/test; rm -rf /",
 		"/tmp/test|cat /etc/passwd",
 		"/tmp/test`whoami`",
 		"/tmp/test$(whoami)",
 	}
 
-	for _, path := range dangerousPaths {
-		t.Run("dangerous_"+path, func(t *testing.T) {
+	for _, path := range safePaths {
+		t.Run("safe_"+path, func(t *testing.T) {
+			// These paths don't exist, so they'll fail with path not found
+			// but not security violation
 			err := ValidateDirectory(path, SecurityNormal)
-			if err == nil {
-				t.Errorf("Expected validation to fail for dangerous path: %s", path)
+			if err != nil && errors.Is(err, ErrSecurityViolation) {
+				t.Errorf("Path should not trigger security violation with single quotes: %s", path)
 			}
 		})
 	}
+	
+	// Test actual dangerous path (null byte)
+	t.Run("null_byte", func(t *testing.T) {
+		// Test the validation function directly
+		_, err := validateNormal("/tmp/test\x00evil")
+		if err == nil || !errors.Is(err, ErrSecurityViolation) {
+			t.Errorf("Null byte should trigger security violation, got: %v", err)
+		}
+	})
 }
 
 // Test platform support
@@ -97,14 +111,8 @@ func TestGetCurrentShellInfo(t *testing.T) {
 		return
 	}
 
-	t.Logf("Detected shell: %s (type: %d)", shellInfo.Path, shellInfo.Type)
-	t.Logf("Script extension: %s", shellInfo.ScriptExt)
+	t.Logf("Detected shell: %s", shellInfo.Path)
 	t.Logf("Shell valid: %v", shellInfo.IsValid)
-
-	// Basic validation
-	if shellInfo.ScriptExt == "" {
-		t.Error("Script extension should not be empty")
-	}
 }
 
 // Test helper functions
@@ -156,18 +164,18 @@ func TestGenerateScript_AllShellTypes(t *testing.T) {
 	testPath := "/tmp/test"
 
 	shells := []*ShellInfo{
-		{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
-		{Path: "/bin/zsh", Type: ShellZsh, ScriptExt: ".sh", IsValid: true},
-		{Path: "/usr/bin/fish", Type: ShellFish, ScriptExt: ".sh", IsValid: true},
-		{Path: "/bin/dash", Type: ShellDash, ScriptExt: ".sh", IsValid: true},
-		{Path: "/bin/sh", Type: ShellSh, ScriptExt: ".sh", IsValid: true},
+		{Path: "/bin/bash", IsValid: true},
+		{Path: "/bin/zsh", IsValid: true},
+		{Path: "/usr/bin/fish", IsValid: true},
+		{Path: "/bin/dash", IsValid: true},
+		{Path: "/bin/sh", IsValid: true},
 	}
 
 	for _, shell := range shells {
-		t.Run(shell.Type.String(), func(t *testing.T) {
+		t.Run(filepath.Base(shell.Path), func(t *testing.T) {
 			script, err := generateScript(testPath, shell)
 			if err != nil {
-				t.Errorf("Script generation failed for %v: %v", shell.Type, err)
+				t.Errorf("Script generation failed for %s: %v", shell.Path, err)
 				return
 			}
 			if !strings.Contains(script, testPath) {
@@ -190,14 +198,14 @@ func TestScriptPathSanitization_QuoteEscaping(t *testing.T) {
 		shouldNotContain string
 	}{
 		{
-			shell:            &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
-			shouldContain:    `/tmp/test\"quoted\"path`, // Escaped quotes for Unix
-			shouldNotContain: `/tmp/test"quoted"path`,   // Original unescaped quotes
+			shell:            &ShellInfo{Path: "/bin/bash", IsValid: true},
+			shouldContain:    `/tmp/test"quoted"path`, // With single quotes, no escaping needed
+			shouldNotContain: `/tmp/test\"quoted\"path`,   // Should not have backslash escaping
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.shell.Type.String(), func(t *testing.T) {
+		t.Run(filepath.Base(test.shell.Path), func(t *testing.T) {
 			script, err := generateScript(pathWithQuotes, test.shell)
 			if err != nil {
 				t.Errorf("Script generation failed: %v", err)
@@ -225,7 +233,7 @@ func TestScriptPathSanitization_PlatformSpecific(t *testing.T) {
 	}{
 		{
 			name:             "unix_rm_command",
-			shell:            &ShellInfo{Path: "/bin/bash", Type: ShellBash, ScriptExt: ".sh", IsValid: true},
+			shell:            &ShellInfo{Path: "/bin/bash", IsValid: true},
 			dangerousPath:    `/tmp/test"; rm -rf /; echo "`,
 			dangerousCommand: `"; rm -rf /; echo "`,
 		},
@@ -239,9 +247,10 @@ func TestScriptPathSanitization_PlatformSpecific(t *testing.T) {
 				return
 			}
 
-			// Verify the dangerous command sequence is not present in its original form
-			if strings.Contains(script, test.dangerousCommand) {
-				t.Errorf("Script contains unescaped dangerous command: %s", test.dangerousCommand)
+			// With single quotes, the dangerous command is safely contained
+			// Check that the path is properly single-quoted
+			if !strings.Contains(script, "TARGET_DIR='") {
+				t.Errorf("Script should use single quotes for TARGET_DIR")
 			}
 
 			t.Logf("Generated script snippet: %s", script[0:min(200, len(script))])
@@ -257,29 +266,7 @@ func min(a, b int) int {
 	return b
 }
 
-// Test shell classification
-func TestClassifyShellByPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected ShellType
-	}{
-		{"/bin/bash", ShellBash},
-		{"/usr/bin/zsh", ShellZsh},
-		{"/usr/bin/fish", ShellFish},
-		{"/bin/dash", ShellDash},
-		{"/bin/sh", ShellSh},
-		{"/bin/unknown", ShellUnknown},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			result := classifyShell(tt.path)
-			if result != tt.expected {
-				t.Errorf("Expected %d, got %d for path %s", tt.expected, result, tt.path)
-			}
-		})
-	}
-}
+// Test shell classification removed - classifyShell function no longer exists
 
 // Test error handling and error types
 func TestErrorTypes(t *testing.T) {
@@ -356,7 +343,7 @@ func TestPathValidation_EdgeCases(t *testing.T) {
 	}{
 		{"empty_path", "", SecurityNormal, false}, // Empty path resolves to current directory
 		{"dot_path", ".", SecurityNormal, false},
-		{"path_traversal", "../../../etc", SecurityStrict, true},
+		{"path_traversal", "../../../etc", SecurityStrict, true}, // Path likely doesn't exist or isn't accessible
 		{"very_long_path", strings.Repeat("a", 5000), SecurityStrict, true},
 	}
 

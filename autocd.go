@@ -115,8 +115,7 @@ func ExitWithDirectoryAdvanced(targetPath string, opts *Options) error {
 	}
 
 	if opts.DebugMode {
-		fmt.Fprintf(os.Stderr, "autocd: shell=%s (%d)\n",
-			shell.Path, shell.Type)
+		fmt.Fprintf(os.Stderr, "autocd: shell=%s\n", shell.Path)
 	}
 
 	// 4. Generate appropriate script
@@ -126,7 +125,7 @@ func ExitWithDirectoryAdvanced(targetPath string, opts *Options) error {
 	}
 
 	// 5. Write script to temporary file
-	scriptPath, err := createTemporaryScript(scriptContent, shell.ScriptExt, opts.TempDir)
+	scriptPath, err := createTemporaryScript(scriptContent, ".sh", opts.TempDir)
 	if err != nil {
 		return newScriptCreationError(err)
 	}

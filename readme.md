@@ -81,10 +81,10 @@ func main() {
 
 The library uses a clever but simple approach:
 
-1. **Creates a transition script** that changes to your target directory
-2. **Replaces the current process** with this script using `syscall.Exec`
-3. **The script changes directory** and spawns a new shell
-4. **User gets a shell** in the final directory
+1. **Creates a POSIX shell script** that changes to your target directory
+2. **Replaces the current process** with `/bin/sh` executing this script via `syscall.Exec`
+3. **The script changes directory** and then replaces itself with the user's shell
+4. **User gets their preferred shell** in the final directory
 
 From the user's perspective, they just run your app and end up where they navigated to.
 
@@ -142,14 +142,14 @@ The library automatically detects your shell. No configuration needed.
 
 AutoCD includes built-in security features:
 
-- **Path validation** prevents directory traversal attacks
-- **Shell injection protection** sanitizes paths before script generation
+- **Path validation** with accessibility checks ensures directories exist and are readable
+- **Shell injection protection** using single-quote escaping for all paths
 - **Configurable security levels** from permissive to strict
-- **Temporary script cleanup** prevents accumulation of script files
+- **Automatic cleanup** of temporary scripts using trap and periodic removal
 
 Choose your security level:
-- `SecurityNormal` (default) - Balanced security and usability
-- `SecurityStrict` - Paranoid validation for security-critical applications  
+- `SecurityNormal` (default) - Path validation, null byte check, accessibility verification
+- `SecurityStrict` - Character whitelist, length limits, comprehensive validation
 - `SecurityPermissive` - Minimal validation when you handle security yourself
 
 ## Error Handling

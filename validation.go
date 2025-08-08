@@ -32,6 +32,11 @@ func validateTargetPath(path string, level SecurityLevel) (string, error) {
 	if !info.IsDir() {
 		return "", ErrPathNotDirectory
 	}
+	
+	// Check if directory is accessible (can be read/executed)
+	if _, err := os.ReadDir(absPath); err != nil {
+		return "", ErrPathNotAccessible
+	}
 
 	// Security level specific validation
 	switch level {
@@ -47,10 +52,6 @@ func validateTargetPath(path string, level SecurityLevel) (string, error) {
 }
 
 func validateStrict(path string) (string, error) {
-	// No path traversal
-	if strings.Contains(path, "..") {
-		return "", ErrSecurityViolation
-	}
 
 	// Character whitelist for Unix paths
 	if !isValidUnixPath(path) {
@@ -65,21 +66,17 @@ func validateStrict(path string) (string, error) {
 	return path, nil
 }
 
-// Pre-compiled dangerous characters for performance
-var dangerousChars = [...]string{";", "|", "&", "`", "$", "(", ")", "<", ">"}
-
 func validateNormal(path string) (string, error) {
-	// Prevent obvious path traversal
+	// Clean the path first
 	cleanPath := filepath.Clean(path)
-	if strings.Contains(cleanPath, "../") || strings.Contains(cleanPath, "..\\\\") {
+	
+	// With proper single-quote escaping in scripts, we don't need to block
+	// most shell metacharacters in directory names. Only block the most
+	// dangerous combinations that could break out of quotes.
+	
+	// Check for null bytes which can't be in valid paths
+	if strings.Contains(path, "\x00") {
 		return "", ErrSecurityViolation
-	}
-
-	// Basic shell injection prevention - use array for better performance
-	for _, char := range dangerousChars {
-		if strings.Contains(path, char) {
-			return "", ErrSecurityViolation
-		}
 	}
 
 	return cleanPath, nil
