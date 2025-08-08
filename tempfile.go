@@ -42,9 +42,13 @@ func createTemporaryScript(content, extension string, tempDir string) (string, e
 
 // cleanupOldScripts removes old autocd scripts (optional cleanup)
 func cleanupOldScripts(maxAge time.Duration) error {
-	tempDir := os.TempDir()
+	// Clean in default temp dir
+	return cleanupOldScriptsInDir(os.TempDir(), maxAge)
+}
 
-	entries, err := os.ReadDir(tempDir)
+// cleanupOldScriptsInDir removes old autocd scripts in a specific directory
+func cleanupOldScriptsInDir(dir string, maxAge time.Duration) error {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err // Non-fatal - just return error
 	}
@@ -57,9 +61,8 @@ func cleanupOldScripts(maxAge time.Duration) error {
 				continue // Skip files we can't stat
 			}
 
-			// Use pre-calculated cutoff time for better performance
 			if info.ModTime().Before(cutoff) {
-				os.Remove(filepath.Join(tempDir, entry.Name()))
+				os.Remove(filepath.Join(dir, entry.Name()))
 			}
 		}
 	}
@@ -70,7 +73,7 @@ func cleanupOldScripts(maxAge time.Duration) error {
 // CleanupOldScripts is a public function to clean up old autocd scripts
 // Applications can call this periodically to prevent temp directory buildup
 func CleanupOldScripts() error {
-	// Clean up scripts older than 24 hours
+	// Clean up scripts older than 24 hours in default temp dir
 	return cleanupOldScripts(24 * time.Hour)
 }
 

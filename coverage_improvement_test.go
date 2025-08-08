@@ -354,12 +354,12 @@ func TestFileExists_DirectoryCase(t *testing.T) {
 	if fileExists(tempFile) {
 		t.Error("fileExists should return false for non-executable file")
 	}
-	
+
 	// Make it executable
 	if err := os.Chmod(tempFile, 0755); err != nil {
 		t.Fatalf("Failed to make file executable: %v", err)
 	}
-	
+
 	if !fileExists(tempFile) {
 		t.Error("fileExists should return true for executable file")
 	}
@@ -389,22 +389,22 @@ func TestValidateNormal_AdditionalCases(t *testing.T) {
 			if err != nil {
 				t.Errorf("validateNormal should not reject path with %q character when using single quotes: %v", char, err)
 			}
-			
+
 			if cleanedPath == "" {
 				t.Error("validateNormal should return cleaned path")
 			}
 		})
 	}
-	
+
 	// Test null byte (should still be rejected)
 	t.Run("null_byte", func(t *testing.T) {
 		path := "/tmp/test\x00file"
 		_, err := validateNormal(path)
-		
+
 		if err == nil {
 			t.Error("validateNormal should reject path with null byte")
 		}
-		
+
 		if !errors.Is(err, ErrSecurityViolation) {
 			t.Error("Expected ErrSecurityViolation for null byte")
 		}
@@ -453,11 +453,17 @@ func TestDetectUnixShell_EdgeCases(t *testing.T) {
 		t.Errorf("detectUnixShell with no SHELL env should default to /bin/sh, got %s", shell.Path)
 	}
 
-	// Test with custom SHELL
+	// Test with custom SHELL; fallback to /bin/sh if invalid
 	os.Setenv("SHELL", "/usr/bin/fish")
 	shell = detectUnixShell()
-	if shell.Path != "/usr/bin/fish" {
-		t.Error("detectUnixShell should detect fish shell from SHELL env")
+	if fileExists("/usr/bin/fish") {
+		if shell.Path != "/usr/bin/fish" {
+			t.Error("detectUnixShell should detect fish shell from SHELL env when present")
+		}
+	} else {
+		if shell.Path != "/bin/sh" {
+			t.Error("detectUnixShell should fallback to /bin/sh when SHELL is invalid")
+		}
 	}
 }
 

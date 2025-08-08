@@ -9,9 +9,10 @@ import (
 func generateScript(targetDir string, shell *ShellInfo) (string, error) {
 	// Sanitize path for script injection prevention
 	safePath := sanitizePathForShell(targetDir)
+	safeShellPath := sanitizePathForShell(shell.Path)
 
 	// Generate Unix shell script
-	return generateUnixScript(safePath, shell.Path), nil
+	return generateUnixScript(safePath, safeShellPath), nil
 }
 
 func generateUnixScript(targetDir, shellPath string) string {
@@ -20,8 +21,6 @@ func generateUnixScript(targetDir, shellPath string) string {
 
 	return fmt.Sprintf(`%s
 # autocd transition script - auto-cleanup on exit
-trap 'rm -f "$0" 2>/dev/null || true' EXIT INT TERM
-
 TARGET_DIR='%s'
 SHELL_PATH='%s'
 

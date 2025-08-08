@@ -32,11 +32,9 @@ func validateTargetPath(path string, level SecurityLevel) (string, error) {
 	if !info.IsDir() {
 		return "", ErrPathNotDirectory
 	}
-	
-	// Check if directory is accessible (can be read/executed)
-	if _, err := os.ReadDir(absPath); err != nil {
-		return "", ErrPathNotAccessible
-	}
+
+	// Do not require read permission; cd only needs execute permission on Unix.
+	// We intentionally skip a read-access check to allow enterable but non-listable directories.
 
 	// Security level specific validation
 	switch level {
@@ -69,11 +67,11 @@ func validateStrict(path string) (string, error) {
 func validateNormal(path string) (string, error) {
 	// Clean the path first
 	cleanPath := filepath.Clean(path)
-	
+
 	// With proper single-quote escaping in scripts, we don't need to block
 	// most shell metacharacters in directory names. Only block the most
 	// dangerous combinations that could break out of quotes.
-	
+
 	// Check for null bytes which can't be in valid paths
 	if strings.Contains(path, "\x00") {
 		return "", ErrSecurityViolation

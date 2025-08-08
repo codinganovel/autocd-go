@@ -101,6 +101,15 @@ func ExitWithDirectoryAdvanced(targetPath string, opts *Options) error {
 		}
 	}
 
+	// If a custom temp dir is specified, clean it as well
+	if opts.TempDir != "" && DirectoryExists(opts.TempDir) {
+		if err := cleanupOldScriptsInDir(opts.TempDir, 1*time.Hour); err != nil {
+			if opts.DebugMode {
+				fmt.Fprintf(os.Stderr, "autocd: cleanup (custom temp) warning: %v\n", err)
+			}
+		}
+	}
+
 	// 2. Validate target directory
 	validatedPath, err := validateTargetPath(targetPath, opts.SecurityLevel)
 	if err != nil {

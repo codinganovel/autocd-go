@@ -97,6 +97,7 @@ opts := &autocd.Options{
     SecurityLevel: autocd.SecurityStrict,  // Extra path validation
     DebugMode:     true,                   // Verbose logging
     Shell:         "zsh",                  // Force specific shell
+    TempDir:       "/custom/temp",         // Custom temp directory (also cleaned)
 }
 
 err := autocd.ExitWithDirectoryAdvanced("/target/path", opts)
@@ -134,7 +135,7 @@ autocd.ExitWithDirectoryOrFallback("/target/path", func() {
 - **macOS** - bash, zsh, fish, dash, sh  
 - **BSD** - sh, bash, zsh
 
-The library automatically detects your shell. No configuration needed.
+The library automatically detects your shell from the `SHELL` environment variable, with automatic fallback to `/bin/sh` if the shell is invalid or missing.
 
 **Note:** AutoCD Go is now focused on Unix-like systems (Linux, macOS, BSD). Windows support has been removed to simplify the architecture and focus on the core Unix use case where directory inheritance is most valuable.
 
@@ -142,13 +143,13 @@ The library automatically detects your shell. No configuration needed.
 
 AutoCD includes built-in security features:
 
-- **Path validation** with accessibility checks ensures directories exist and are readable
-- **Shell injection protection** using single-quote escaping for all paths
+- **Path validation** ensures directories exist and are accessible (execute permission required)
+- **Shell injection protection** using single-quote escaping for all paths and shell commands
 - **Configurable security levels** from permissive to strict
-- **Automatic cleanup** of temporary scripts using trap and periodic removal
+- **Automatic cleanup** of temporary scripts via periodic removal on subsequent runs
 
 Choose your security level:
-- `SecurityNormal` (default) - Path validation, null byte check, accessibility verification
+- `SecurityNormal` (default) - Path validation, null byte check, directory verification
 - `SecurityStrict` - Character whitelist, length limits, comprehensive validation
 - `SecurityPermissive` - Minimal validation when you handle security yourself
 

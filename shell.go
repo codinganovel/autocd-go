@@ -47,6 +47,11 @@ func detectUnixShell() *ShellInfo {
 		shell = "/bin/sh" // POSIX fallback
 	}
 
+	// If SHELL is set but invalid, fallback to /bin/sh
+	if !fileExists(shell) {
+		shell = "/bin/sh"
+	}
+
 	return &ShellInfo{
 		Path:    shell,
 		IsValid: fileExists(shell),

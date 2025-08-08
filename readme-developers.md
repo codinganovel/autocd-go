@@ -46,9 +46,7 @@ Instead of complex shell monitoring or protocols, the library uses a simple but 
 ### Example Transition Script (Unix)
 ```bash
 #!/bin/sh
-# autocd transition script - auto-cleanup on exit
-trap 'rm -f "$0" 2>/dev/null || true' EXIT INT TERM
-
+# autocd transition script
 TARGET_DIR='/final/directory'
 SHELL_PATH='/bin/bash'
 
@@ -352,8 +350,8 @@ The shell depth system includes comprehensive test coverage in `shell_depth_test
 The library uses a simplified approach for Unix systems:
 
 1. **Shell override** - If specified in Options
-2. **SHELL environment variable** - User's preferred shell
-3. **Fallback** to `/bin/sh` (POSIX standard)
+2. **SHELL environment variable** - User's preferred shell (validated for existence)
+3. **Fallback** to `/bin/sh` if SHELL is invalid or missing (POSIX standard)
 
 All shells are treated identically - the library always generates POSIX scripts executed with `/bin/sh`, which then exec into the user's preferred shell.
 
@@ -391,7 +389,7 @@ func validateStrict(path string) (string, error) {
 **Restrictions:**
 - Path cleaning via `filepath.Clean`
 - Null byte prevention (can't exist in valid paths)
-- Directory must exist and be accessible
+- Directory must exist and have execute permission (cd requirement)
 
 ```go
 func validateNormal(path string) (string, error) {
@@ -422,7 +420,7 @@ func validatePermissive(path string) (string, error) {
 
 ### Shell Injection Prevention
 
-The library uses single-quote escaping for all paths, providing robust protection:
+The library uses single-quote escaping for all paths and shell commands, providing robust protection:
 
 ```go
 func sanitizePathForShell(path string) string {
@@ -432,7 +430,7 @@ func sanitizePathForShell(path string) string {
 }
 ```
 
-Paths are wrapped in single quotes in the generated scripts, preventing shell interpretation of special characters.
+Both directory paths and shell paths are wrapped in single quotes in the generated scripts, preventing shell interpretation of special characters and injection via SHELL environment variable.
 
 ## Script Generation
 
@@ -441,9 +439,7 @@ The library generates platform and shell-specific transition scripts:
 ### Unix Script Template
 ```bash
 #!/bin/sh
-# autocd transition script - auto-cleanup on exit
-trap 'rm -f "$0" 2>/dev/null || true' EXIT INT TERM
-
+# autocd transition script
 TARGET_DIR='/path/to/directory'
 SHELL_PATH='/bin/bash'
 
@@ -462,8 +458,9 @@ exec "$SHELL_PATH"
 **Key Implementation Points:**
 - Always uses `#!/bin/sh` shebang for POSIX compatibility
 - Scripts are executed with `/bin/sh` regardless of user's shell (fixes Fish compatibility)
-- Single quotes protect paths from shell injection
+- Single quotes protect paths from shell injection (including shell path itself)
 - The script execs into the user's preferred shell at the end
+- No `trap` cleanup since `exec` replaces the process
 
 ## Error Handling
 
@@ -659,8 +656,8 @@ func createTemporaryScript(content, extension string, tempDir string) (string, e
 ### Cleanup Utilities
 - **File Pattern:** `autocd_*.sh` (shell scripts)
 - **Permissions:** Files get 0700 (owner only read/write/execute)
-- **Self-Cleanup:** Scripts use `trap` for automatic cleanup
 - **Automatic Cleanup:** Library automatically cleans up scripts older than 1 hour on each call
+- **Custom Directory Cleanup:** If TempDir is specified in Options, that directory is also cleaned
 - **Manual Cleanup:** `CleanupOldScripts()` available for additional maintenance
 
 ### Utility Functions
@@ -699,10 +696,10 @@ func executeScript(scriptPath string, shell *ShellInfo, debugMode bool) error {
 1. **Script Creation** - Generate and write transition script
 2. **Permission Setting** - Make executable (Unix only)
 3. **Process Replacement** - `syscall.Exec` replaces current process
-4. **Script Execution** - OS runs the script
+4. **Script Execution** - OS runs the script with `/bin/sh`
 5. **Directory Change** - Script changes to target directory
-6. **Shell Spawn** - Script starts new shell and exits
-7. **Cleanup** - Script removes itself using trap
+6. **Shell Spawn** - Script execs into user's shell (replacing itself)
+7. **Cleanup** - Orphaned scripts cleaned on next autocd call (1 hour timeout)
 
 ## Testing
 
