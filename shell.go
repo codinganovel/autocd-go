@@ -61,7 +61,8 @@ func detectUnixShell() *ShellInfo {
 // fileExists checks if a file exists and is executable
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
+	// On any stat error (including not-exist or permission issues), treat as not existing/usable
+	if err != nil {
 		return false
 	}
 	if info.IsDir() {

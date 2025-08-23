@@ -85,7 +85,7 @@ func TestPathValidation_DangerousCharacters(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// Test actual dangerous path (null byte)
 	t.Run("null_byte", func(t *testing.T) {
 		// Test the validation function directly
@@ -199,8 +199,8 @@ func TestScriptPathSanitization_QuoteEscaping(t *testing.T) {
 	}{
 		{
 			shell:            &ShellInfo{Path: "/bin/bash", IsValid: true},
-			shouldContain:    `/tmp/test"quoted"path`, // With single quotes, no escaping needed
-			shouldNotContain: `/tmp/test\"quoted\"path`,   // Should not have backslash escaping
+			shouldContain:    `/tmp/test"quoted"path`,   // With single quotes, no escaping needed
+			shouldNotContain: `/tmp/test\"quoted\"path`, // Should not have backslash escaping
 		},
 	}
 

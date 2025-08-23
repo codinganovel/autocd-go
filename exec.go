@@ -36,9 +36,19 @@ func ExecReplacement(scriptPath string, shell *ShellInfo, debugMode bool) error 
 		return newShellDetectionError(fmt.Sprintf("shell is not valid: %s", shell.Path))
 	}
 
-	// Check that script file exists
-	if !fileExists(scriptPath) {
-		return newPathError(ErrorPathNotFound, scriptPath, fmt.Errorf("script file does not exist"))
+	// Check that script file exists and is executable
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return newPathError(ErrorPathNotFound, scriptPath, fmt.Errorf("script file does not exist"))
+		}
+		return newPathError(ErrorPathNotAccessible, scriptPath, fmt.Errorf("unable to access script: %w", err))
+	}
+	if info.IsDir() {
+		return newPathError(ErrorPathNotDirectory, scriptPath, fmt.Errorf("script path is a directory"))
+	}
+	if info.Mode()&0111 == 0 {
+		return newPathError(ErrorPathNotAccessible, scriptPath, fmt.Errorf("script file is not executable"))
 	}
 
 	// Execute the script - this should never return
